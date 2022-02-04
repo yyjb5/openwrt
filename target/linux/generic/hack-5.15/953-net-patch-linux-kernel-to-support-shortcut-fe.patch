@@ -1,0 +1,219 @@
+--- a/include/linux/if_bridge.h
++++ b/include/linux/if_bridge.h
+@@ -62,6 +62,9 @@ struct br_ip_list {
+ 
+ extern void brioctl_set(int (*ioctl_hook)(struct net *, unsigned int, void __user *));
+ 
++extern void br_dev_update_stats(struct net_device *dev,
++				struct rtnl_link_stats64 *nlstats);
++
+ #if IS_ENABLED(CONFIG_BRIDGE) && IS_ENABLED(CONFIG_BRIDGE_IGMP_SNOOPING)
+ int br_multicast_list_adjacent(struct net_device *dev,
+ 			       struct list_head *br_ip_list);
+--- a/include/linux/skbuff.h
++++ b/include/linux/skbuff.h
+@@ -860,6 +860,10 @@ struct sk_buff {
+ #endif
+ 	__u8			gro_skip:1;
+ 
++#ifdef CONFIG_SHORTCUT_FE
++	__u8			fast_forwarded:1;
++#endif
++
+ #ifdef CONFIG_NET_SCHED
+ 	__u16			tc_index;	/* traffic control index */
+ #endif
+--- a/include/linux/timer.h
++++ b/include/linux/timer.h
+@@ -18,6 +18,10 @@ struct timer_list {
+ 	void			(*function)(struct timer_list *);
+ 	u32			flags;
+ 
++#ifdef CONFIG_SHORTCUT_FE
++	unsigned long		cust_data;
++#endif
++
+ #ifdef CONFIG_LOCKDEP
+ 	struct lockdep_map	lockdep_map;
+ #endif
+--- a/include/net/netfilter/nf_conntrack_ecache.h
++++ b/include/net/netfilter/nf_conntrack_ecache.h
+@@ -75,6 +75,8 @@ struct nf_ct_event {
+ #ifdef CONFIG_NF_CONNTRACK_CHAIN_EVENTS
+ extern int nf_conntrack_register_notifier(struct net *net, struct notifier_block *nb);
+ extern int nf_conntrack_unregister_notifier(struct net *net, struct notifier_block *nb);
++extern int nf_conntrack_register_chain_notifier(struct net *net, struct notifier_block *nb);
++extern int nf_conntrack_unregister_chain_notifier(struct net *net, struct notifier_block *nb);
+ #else
+ struct nf_ct_event_notifier {
+ 	int (*fcn)(unsigned int events, struct nf_ct_event *item);
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -2715,12 +2715,24 @@ static inline void dev_sw_netstats_rx
+ 	u64_stats_update_begin(&tstats->syncp);
+ 	tstats->rx_bytes += len;
+ 	tstats->rx_packets++;
+ 	u64_stats_update_end(&tstats->syncp);
+ }
+ 
++static inline void dev_sw_netstats_rx_packets_add(struct net_device *dev,
++					  unsigned int packets,
++					  unsigned int len)
++{
++	struct pcpu_sw_netstats *tstats = this_cpu_ptr(dev->tstats);
++
++	u64_stats_update_begin(&tstats->syncp);
++	tstats->rx_bytes += len;
++	tstats->rx_packets += packets;
++	u64_stats_update_end(&tstats->syncp);
++}
++
+ static inline void dev_sw_netstats_tx_add(struct net_device *dev,
+ 					  unsigned int packets,
+ 					  unsigned int len)
+ {
+ 	struct pcpu_sw_netstats *tstats = this_cpu_ptr(dev->tstats);
+ 
+--- a/net/bridge/br_if.c
++++ b/net/bridge/br_if.c
+@@ -779,6 +779,18 @@ void br_port_flags_change(struct net_bri
+ 		br_recalculate_neigh_suppress_enabled(br);
+ }
+ 
++void br_dev_update_stats(struct net_device *dev,
++			 struct rtnl_link_stats64 *nlstats)
++{
++	/* Is this a bridge? */
++	if (!(dev->priv_flags & IFF_EBRIDGE))
++		return;
++
++	dev_sw_netstats_rx_packets_add(dev, nlstats->rx_packets, nlstats->rx_bytes);
++	dev_sw_netstats_tx_add(dev, nlstats->tx_packets, nlstats->tx_bytes);
++}
++EXPORT_SYMBOL_GPL(br_dev_update_stats);
++
+ bool br_port_flag_is_set(const struct net_device *dev, unsigned long flag)
+ {
+ 	struct net_bridge_port *p;
+--- a/net/core/dev.c
++++ b/net/core/dev.c
+@@ -3643,8 +3643,17 @@ static int xmit_one(struct sk_buff *skb,
+ 	unsigned int len;
+ 	int rc;
+ 
++#ifdef CONFIG_SHORTCUT_FE
++	/* If this skb has been fast forwarded then we don't want it to
++	 * go to any taps (by definition we're trying to bypass them).
++	 */
++	if (!skb->fast_forwarded) {
++#endif
+ 	if (dev_nit_active(dev))
+ 		dev_queue_xmit_nit(skb, dev);
++#ifdef CONFIG_SHORTCUT_FE
++	}
++#endif
+ 
+ 	len = skb->len;
+ 	PRANDOM_ADD_NOISE(skb, dev, txq, len + jiffies);
+@@ -5190,6 +5199,11 @@ void netdev_rx_handler_unregister(struct
+ }
+ EXPORT_SYMBOL_GPL(netdev_rx_handler_unregister);
+ 
++#ifdef CONFIG_SHORTCUT_FE
++int (*athrs_fast_nat_recv)(struct sk_buff *skb) __rcu __read_mostly;
++EXPORT_SYMBOL_GPL(athrs_fast_nat_recv);
++#endif
++
+ /*
+  * Limit the use of PFMEMALLOC reserves to those protocols that implement
+  * the special handling of PFMEMALLOC skbs.
+@@ -5238,6 +5252,10 @@ static int __netif_receive_skb_core(stru
+ 	int ret = NET_RX_DROP;
+ 	__be16 type;
+ 
++#ifdef CONFIG_SHORTCUT_FE
++	int (*fast_recv)(struct sk_buff *skb);
++#endif
++
+ 	net_timestamp_check(!netdev_tstamp_prequeue, skb);
+ 
+ 	trace_netif_receive_skb(skb);
+@@ -5277,6 +5295,16 @@ another_round:
+ 			goto out;
+ 	}
+ 
++#ifdef CONFIG_SHORTCUT_FE
++	fast_recv = rcu_dereference(athrs_fast_nat_recv);
++	if (fast_recv) {
++		if (fast_recv(skb)) {
++			ret = NET_RX_SUCCESS;
++			goto out;
++		}
++	}
++#endif
++
+ 	if (skb_skip_tc_classify(skb))
+ 		goto skip_classify;
+ 
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -465,3 +465,6 @@ config HAVE_CBPF_JIT
+ 	  e.g. notification messages.
+ 
+ endif   # if NET
++
++config SHORTCUT_FE
++	bool "Enables kernel network stack path for Shortcut  Forwarding Engine
+--- a/net/netfilter/nf_conntrack_proto_tcp.c
++++ b/net/netfilter/nf_conntrack_proto_tcp.c
+@@ -28,12 +28,24 @@
+ #include <net/netfilter/nf_conntrack_synproxy.h>
+ #include <net/netfilter/nf_conntrack_timeout.h>
+ #include <net/netfilter/nf_log.h>
+ #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
+ #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
+ 
++/* Do not check the TCP window for incoming packets  */
++int nf_ct_tcp_no_window_check __read_mostly = 1;
++ 
++EXPORT_SYMBOL_GPL(nf_ct_tcp_no_window_check);
++
++/* "Be conservative in what you do,
++    be liberal in what you accept from others."
++    If it's non-zero, we mark only out of window RST segments as INVALID. */
++int nf_ct_tcp_be_liberal __read_mostly = 0;
++
++EXPORT_SYMBOL_GPL(nf_ct_tcp_be_liberal);
++
+   /* FIXME: Examine ipfilter's timeouts and conntrack transitions more
+      closely.  They're more complex. --RR */
+ 
+ static const char *const tcp_conntrack_names[] = {
+ 	"NONE",
+ 	"SYN_SENT",
+--- a/net/netfilter/nf_conntrack_ecache.c
++++ b/net/netfilter/nf_conntrack_ecache.c
+@@ -350,6 +373,11 @@ int nf_conntrack_register_notifier(struc
+ {
+         return atomic_notifier_chain_register(&net->ct.nf_conntrack_chain, nb);
+ }
++int nf_conntrack_register_chain_notifier(struct net *net, struct notifier_block *nb)
++{
++	return atomic_notifier_chain_register(&net->ct.nf_conntrack_chain, nb);
++}
++EXPORT_SYMBOL_GPL(nf_conntrack_register_chain_notifier);
+ #else
+ int nf_conntrack_register_notifier(struct net *net,
+ 				   struct nf_ct_event_notifier *new)
+@@ -379,6 +407,11 @@ int nf_conntrack_unregister_notifier(str
+ {
+ 	return atomic_notifier_chain_unregister(&net->ct.nf_conntrack_chain, nb);
+ }
++int nf_conntrack_unregister_chain_notifier(struct net *net, struct notifier_block *nb)
++{
++	return atomic_notifier_chain_unregister(&net->ct.nf_conntrack_chain, nb);
++}
++EXPORT_SYMBOL_GPL(nf_conntrack_unregister_chain_notifier);
+ #else
+ void nf_conntrack_unregister_notifier(struct net *net,
+ 				      struct nf_ct_event_notifier *new)

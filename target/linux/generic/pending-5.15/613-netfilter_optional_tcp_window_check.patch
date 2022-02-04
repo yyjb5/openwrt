@@ -29,6 +29,16 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
  	else
 --- a/net/netfilter/nf_conntrack_standalone.c
 +++ b/net/netfilter/nf_conntrack_standalone.c
+@@ -25,6 +25,9 @@
+ #include <net/netfilter/nf_conntrack_timestamp.h>
+ #include <linux/rculist_nulls.h>
+ 
++/* Do not check the TCP window for incoming packets  */
++static int nf_ct_tcp_no_window_check __read_mostly = 1;
++
+ static bool enable_hooks __read_mostly;
+ MODULE_PARM_DESC(enable_hooks, "Always enable conntrack hooks");
+ module_param(enable_hooks, bool, 0000);
 @@ -671,6 +671,7 @@ enum nf_ct_sysctl_index {
  	NF_SYSCTL_CT_LWTUNNEL,
  #endif
