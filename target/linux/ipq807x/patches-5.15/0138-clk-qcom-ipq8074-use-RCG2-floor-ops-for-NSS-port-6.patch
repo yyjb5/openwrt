@@ -1,0 +1,41 @@
+From e6286354d16a02ac337abe55c373139064044965 Mon Sep 17 00:00:00 2001
+From: Robert Marko <robimarko@gmail.com>
+Date: Fri, 14 Oct 2022 15:43:01 +0200
+Subject: [PATCH] clk: qcom: ipq8074: use RCG2 floor ops for NSS port 6
+
+NSS port 6 clocks are currently broken if 125MHz is desired, we will
+actually get 104.6MHz instead.
+
+So, since using RCG2 floor ops appears to fix this, lets use them.
+
+Fixes: 7117a51ed303 ("clk: qcom: ipq8074: add NSS ethernet port clocks")
+Signed-off-by: Robert Marko <robimarko@gmail.com>
+---
+ drivers/clk/qcom/gcc-ipq8074.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/qcom/gcc-ipq8074.c b/drivers/clk/qcom/gcc-ipq8074.c
+index 069ad3b5bca0..db350820bae9 100644
+--- a/drivers/clk/qcom/gcc-ipq8074.c
++++ b/drivers/clk/qcom/gcc-ipq8074.c
+@@ -1892,7 +1892,7 @@ static struct clk_rcg2 nss_port6_rx_clk_src = {
+ 		.name = "nss_port6_rx_clk_src",
+ 		.parent_names = gcc_xo_uniphy2_rx_tx_ubi32_bias,
+ 		.num_parents = 5,
+-		.ops = &clk_rcg2_ops,
++		.ops = &clk_rcg2_floor_ops,
+ 	},
+ };
+ 
+@@ -1934,7 +1934,7 @@ static struct clk_rcg2 nss_port6_tx_clk_src = {
+ 		.name = "nss_port6_tx_clk_src",
+ 		.parent_names = gcc_xo_uniphy2_tx_rx_ubi32_bias,
+ 		.num_parents = 5,
+-		.ops = &clk_rcg2_ops,
++		.ops = &clk_rcg2_floor_ops,
+ 	},
+ };
+ 
+-- 
+2.37.3
+
