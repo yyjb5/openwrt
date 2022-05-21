@@ -24,7 +24,7 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
-		bootargs-append = " root=/dev/ubiblock0_1";
+		bootargs-append = " root=/dev/ubiblock0_0";
 	};
 
 	keys {
@@ -56,6 +56,139 @@
 	};
 };
 
+&qpic_nand {
+	status = "okay";
+
+	/*
+	 * Bootloader will find the NAND DT node by the compatible and
+	 * then "fixup" it by adding the partitions from the SMEM table
+	 * using the legacy bindings thus making it impossible for us
+	 * to change the partition table or utilize NVMEM for calibration.
+	 * So add a dummy partitions node that bootloader will populate
+	 * and set it as disabled so the kernel ignores it instead of
+	 * printing warnings due to the broken way bootloader adds the
+	 * partitions.
+	 */
+	partitions {
+		status = "disabled";
+	};
+
+	nand@0 {
+		reg = <0>;
+		nand-ecc-strength = <4>;
+		nand-ecc-step-size = <512>;
+		nand-bus-width = <8>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "0:sbl1";
+				reg = <0x0 0x100000>;
+				read-only;
+			};
+
+			partition@100000 {
+				label = "0:mibib";
+				reg = <0x100000 0x100000>;
+				read-only;
+			};
+
+			partition@200000 {
+				label = "0:qsee";
+				reg = <0x200000 0x300000>;
+				read-only;
+			};
+
+			partition@500000 {
+				label = "0:devcfg";
+				reg = <0x500000 0x80000>;
+				read-only;
+			};
+
+			partition@580000 {
+				label = "0:rpm";
+				reg = <0x580000 0x80000>;
+				read-only;
+			};
+
+			partition@600000 {
+				label = "0:cdt";
+				reg = <0x600000 0x80000>;
+				read-only;
+			};
+
+			partition@680000 {
+				label = "0:appsblenv";
+				reg = <0x680000 0x80000>;
+			};
+
+			partition@700000 {
+				label = "0:appsbl";
+				reg = <0x700000 0x100000>;
+				read-only;
+			};
+
+			partition@800000 {
+				label = "0:art";
+				reg = <0x800000 0x80000>;
+				read-only;
+			};
+
+			partition@880000 {
+				label = "bdata";
+				reg = <0x880000 0x80000>;
+			};
+
+			partition@900000 {
+				/* This is crash + crash_syslog parts combined */
+				label = "pstore";
+				reg = <0x900000 0x100000>;
+			};
+
+			/* Make the first rootfs a dedicated ubi partition for kernel */
+			partition@a00000 {
+				label = "kernel";
+				reg = <0xa00000 0x23c0000>;
+			};
+
+			/* Place the real rootfs in the original second rootfs and
+			 * expand it to the end of the nand
+			 */
+			rootfs: partition@2dc0000 {
+				label = "rootfs";
+				reg = <0x2dc0000 0xd240000>;
+			};
+
+			/* Original paritions not used as we reworked partition logic
+			 * rootfs to the end of the nand.
+			 */
+			/* partition@a00000 {
+				label = "rootfs";
+				reg = <0xa00000 0x23c0000>;
+			};
+
+			partition@2dc0000 {
+				label = "rootfs_1";
+				reg = <0x2dc0000 0x23c0000>;
+			};
+
+			partition@5180000 {
+				label = "overlay";
+				reg = <0x5180000 0x1ec0000>;
+				read-only;
+			};
+
+			partition@7040000 {
+				label = "rsvd0";
+				reg = <0x7040000 0x80000>;
+			}; */
+		};
+	};
+};
+
 &blsp1_uart5 {
 	status = "okay";
 };
@@ -74,21 +207,6 @@
 
 &qpic_bam {
 	status = "okay";
-};
-
-&qpic_nand {
-	status = "okay";
-
-	nand@0 {
-		reg = <0>;
-		nand-ecc-strength = <4>;
-		nand-ecc-step-size = <512>;
-		nand-bus-width = <8>;
-
-		partitions {
-			compatible = "qcom,smem-part";
-		};
-	};
 };
 
 &mdio {
