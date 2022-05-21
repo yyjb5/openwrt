@@ -34,6 +34,13 @@
 	};
 };
 
+/* ax6 can both have NAND of 256MiB or 128MiB.
+ * To be on the safe side, assume 128MiB of NAND.
+ */
+&rootfs {
+	reg = <0x2dc0000 0x5220000>;
+};
+
 &wifi {
 	qcom,ath11k-calibration-variant = "Redmi-AX6";
 };
