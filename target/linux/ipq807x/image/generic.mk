@@ -10,6 +10,13 @@ define Build/gen-ubi-initramfs
 	rm $@.tmp
 endef
 
+define Device/partition-layout-migration
+  DEVICE_COMPAT_VERSION := 2.0
+  DEVICE_COMPAT_MESSAGE := *** Partition layout has changed from earlier \
+	versions. You need to reinstall the firmware from UART or a migration \
+	initramfs image. Settings will be lost. ***
+endef
+
 define Device/FitImage
 	KERNEL_SUFFIX := -fit-uImage.itb
 	KERNEL = kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(DEVICE_DTS).dtb
@@ -119,6 +126,7 @@ TARGET_DEVICES += redmi_ax6
 define Device/xiaomi_ax3600
 	$(call Device/FitImageUbinize)
 	$(call Device/UbiFitSplit)
+	$(call Device/partition-layout-migration)
 	DEVICE_VENDOR := Xiaomi
 	DEVICE_MODEL := AX3600
 	KERNEL_SIZE := 34816k
