@@ -11,10 +11,25 @@ define Device/FitImage
 	KERNEL_NAME := Image
 endef
 
+define Build/gen-ubi-initramfs
+	sh $(TOPDIR)/scripts/ubinize-image.sh \
+		$(if $(UBOOTENV_IN_UBI),--uboot-env) \
+		--kernel $(KDIR)/tmp/$(KERNEL_INITRAMFS_IMAGE) \
+		$(foreach part,$(UBINIZE_PARTS),--part $(part)) \
+		"$(1).tmp" \
+		-p $(BLOCKSIZE:%k=%KiB) -m $(PAGESIZE) \
+		$(if $(SUBPAGESIZE),-s $(SUBPAGESIZE)) \
+		$(if $(VID_HDR_OFFSET),-O $(VID_HDR_OFFSET)) \
+		$(UBINIZE_OPTS) && \
+	cat "$(1).tmp" > "$(1)" && rm "$(1).tmp" && \
+	$(CP) "$(1)" $(BIN_DIR)/
+endef
+
 define Device/FitImageUbinize
 	KERNEL_SUFFIX := -fit-uImage.itb
 	KERNEL = kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(DEVICE_DTS).dtb | ubinize-kernel
-	KERNEL_INITRAMFS = kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(DEVICE_DTS).dtb
+	KERNEL_INITRAMFS = kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(DEVICE_DTS).dtb with-initrd | \
+	gen-ubi-initramfs $(KDIR)/tmp/$$(KERNEL_INITRAMFS_PREFIX)-factory.ubi
 	KERNEL_NAME := Image
 endef
 
