@@ -1,7 +1,7 @@
 define Device/partition-layout-migration
   DEVICE_COMPAT_VERSION := 2.0
   DEVICE_COMPAT_MESSAGE := *** Partition layout has changed from earlier \
-	versions. You need to reinstall the firmware from UART. Settings \
+	versions. You need to reinstall the firmware from scratch. Settings \
 	will be lost. ***
 endef
 
