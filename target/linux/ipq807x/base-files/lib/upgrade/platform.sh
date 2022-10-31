@@ -20,6 +20,11 @@ platform_do_upgrade_xiaomi_nand() {
 	local kernel_len=$(tar xf "$1" ${board_dir}/kernel -O | wc -c)
 	[ -n "$kernel_len" ] || return
 
+	/etc/init.d/wpad stop 2>/dev/null
+	sleep 16
+	wifi down 2>/dev/null
+	sleep 8
+
 	tar xf "$1" ${board_dir}/kernel -O | ubiformat "$fw_mtd" -y -S $kernel_len -f -
 
 	CI_KERNPART="none"
