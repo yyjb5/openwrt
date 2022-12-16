@@ -4,7 +4,7 @@ on: [push]
 jobs:
     build:
         name: Prepare and build IPQ807x generic images
-        runs-on: ubuntu-latest
+        runs-on: self-hosted
 
         steps:
             - name: Checkout
