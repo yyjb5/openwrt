@@ -60,7 +60,8 @@ endif
 ifneq ($(CONFIG_PACKAGE_kmod-qca-nss-cfi-cryptoapi),)
 MAKE_OPTS+= \
 	cryptoapi=y \
-	NSS_CRYPTOAPI_ABLK=n
+	NSS_CRYPTOAPI_ABLK=n \
+	NSS_CRYPTOAPI_SKCIPHER=y
 endif
 
 define Build/Compile
