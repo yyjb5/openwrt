@@ -255,106 +255,6 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
  static struct ath11k *ath11k_get_ar_on_scan_state(struct ath11k_base *ab,
  						  u32 vdev_id)
  {
-@@ -7330,47 +7414,67 @@ static void ath11k_vdev_install_key_comp
- 	rcu_read_unlock();
- }
- 
--static void ath11k_service_available_event(struct ath11k_base *ab, struct sk_buff *skb)
-+static int  ath11k_wmi_tlv_services_parser(struct ath11k_base *ab,
-+					   u16 tag, u16 len,
-+					   const void *ptr, void *data)
- {
--	const void **tb;
- 	const struct wmi_service_available_event *ev;
--	int ret;
-+	u32 *wmi_ext2_service_bitmap;
- 	int i, j;
- 
--	tb = ath11k_wmi_tlv_parse_alloc(ab, skb->data, skb->len, GFP_ATOMIC);
--	if (IS_ERR(tb)) {
--		ret = PTR_ERR(tb);
--		ath11k_warn(ab, "failed to parse tlv: %d\n", ret);
--		return;
--	}
-+	switch (tag) {
-+	case WMI_TAG_SERVICE_AVAILABLE_EVENT:
-+		ev = (struct wmi_service_available_event *)ptr;
-+		for (i = 0, j = WMI_MAX_SERVICE;
-+		     i < WMI_SERVICE_SEGMENT_BM_SIZE32 && j < WMI_MAX_EXT_SERVICE;
-+		     i++) {
-+			do {
-+				if (ev->wmi_service_segment_bitmap[i] &
-+				    BIT(j % WMI_AVAIL_SERVICE_BITS_IN_SIZE32))
-+					set_bit(j, ab->wmi_ab.svc_map);
-+			} while (++j % WMI_AVAIL_SERVICE_BITS_IN_SIZE32);
-+		}
- 
--	ev = tb[WMI_TAG_SERVICE_AVAILABLE_EVENT];
--	if (!ev) {
--		ath11k_warn(ab, "failed to fetch svc available ev");
--		kfree(tb);
--		return;
--	}
-+		ath11k_dbg(ab, ATH11K_DBG_WMI,
-+			   "wmi_ext_service_bitmap 0:0x%x, 1:0x%x, 2:0x%x, 3:0x%x",
-+			   ev->wmi_service_segment_bitmap[0],
-+			   ev->wmi_service_segment_bitmap[1],
-+			   ev->wmi_service_segment_bitmap[2],
-+			   ev->wmi_service_segment_bitmap[3]);
- 
--	/* TODO: Use wmi_service_segment_offset information to get the service
--	 * especially when more services are advertised in multiple sevice
--	 * available events.
--	 */
--	for (i = 0, j = WMI_MAX_SERVICE;
--	     i < WMI_SERVICE_SEGMENT_BM_SIZE32 && j < WMI_MAX_EXT_SERVICE;
--	     i++) {
--		do {
--			if (ev->wmi_service_segment_bitmap[i] &
--			    BIT(j % WMI_AVAIL_SERVICE_BITS_IN_SIZE32))
--				set_bit(j, ab->wmi_ab.svc_map);
--		} while (++j % WMI_AVAIL_SERVICE_BITS_IN_SIZE32);
-+		break;
-+
-+	case WMI_TAG_ARRAY_UINT32:
-+		wmi_ext2_service_bitmap = (u32 *)ptr;
-+		for (i = 0, j = WMI_MAX_EXT_SERVICE;
-+		     i < WMI_SERVICE_SEGMENT_BM_SIZE32 && j < WMI_MAX_EXT2_SERVICE;
-+		     i++) {
-+			do {
-+				if (wmi_ext2_service_bitmap[i] &
-+				    BIT(j % WMI_AVAIL_SERVICE_BITS_IN_SIZE32))
-+					set_bit(j, ab->wmi_ab.svc_map);
-+			} while (++j % WMI_AVAIL_SERVICE_BITS_IN_SIZE32);
-+		}
-+
-+		ath11k_dbg(ab, ATH11K_DBG_WMI,
-+			   "wmi_ext2_service__bitmap  0:0x%x, 1:0x%x, 2:0x%x, 3:0x%x",
-+			    wmi_ext2_service_bitmap[0], wmi_ext2_service_bitmap[1],
-+			    wmi_ext2_service_bitmap[2], wmi_ext2_service_bitmap[3]);
-+
-+		break;
- 	}
-+	return 0;
-+}
- 
--	ath11k_dbg(ab, ATH11K_DBG_WMI,
--		   "wmi_ext_service_bitmap 0:0x%x, 1:0x%x, 2:0x%x, 3:0x%x",
--		   ev->wmi_service_segment_bitmap[0], ev->wmi_service_segment_bitmap[1],
--		   ev->wmi_service_segment_bitmap[2], ev->wmi_service_segment_bitmap[3]);
-+static void ath11k_service_available_event(struct ath11k_base *ab, struct sk_buff *skb)
-+{
-+	int ret = 0;
- 
--	kfree(tb);
-+	ret = ath11k_wmi_tlv_iter(ab, skb->data, skb->len,
-+				  ath11k_wmi_tlv_services_parser,
-+				  NULL);
-+	if (ret)
-+		ath11k_warn(ab, "failed to parse services available tlv %d\n", ret);
- }
- 
- static void ath11k_peer_assoc_conf_event(struct ath11k_base *ab, struct sk_buff *skb)
 @@ -8439,6 +8543,9 @@ static void ath11k_wmi_tlv_op_rx(struct
  	case WMI_DIAG_EVENTID:
  		ath11k_wmi_diag_event(ab, skb);
@@ -385,22 +285,28 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
  	WMI_TX_ADDBA_COMPLETE_EVENTID,
  	WMI_BA_RSP_SSN_EVENTID,
 @@ -1878,6 +1881,9 @@ enum wmi_tlv_tag {
-	WMI_TAG_PDEV_SRG_OBSS_BSSID_ENABLE_BITMAP_CMD,
-	WMI_TAG_PDEV_NON_SRG_OBSS_COLOR_ENABLE_BITMAP_CMD,
-	WMI_TAG_PDEV_NON_SRG_OBSS_BSSID_ENABLE_BITMAP_CMD,
+ 	WMI_TAG_PDEV_NON_SRG_OBSS_BSSID_ENABLE_BITMAP_CMD,
+ 	WMI_TAG_PDEV_SET_BIOS_SAR_TABLE_CMD = 0x3D8,
+ 	WMI_TAG_PDEV_SET_BIOS_GEO_TABLE_CMD,
 +	/* TODO add all the missing cmds */
 +	WMI_TAG_QOS_NULL_FRAME_TX_SEND = 0x3A6,
 +	WMI_TAG_QOS_NULL_FRAME_TX_STATUS,
  	WMI_TAG_MAX
  };
  
-@@ -2136,8 +2142,21 @@ enum wmi_tlv_service {
+@@ -2090,16 +2090,27 @@
+ 	WMI_TLV_SERVICE_PACKET_CAPTURE_SUPPORT = 212,
+ 	WMI_TLV_SERVICE_PER_PEER_HTT_STATS_RESET = 213,
  	WMI_TLV_SERVICE_FREQINFO_IN_METADATA = 219,
  	WMI_TLV_SERVICE_EXT2_MSG = 220,
+ 	WMI_TLV_SERVICE_PEER_POWER_SAVE_DURATION_SUPPORT = 246,
  	WMI_TLV_SERVICE_SRG_SRP_SPATIAL_REUSE_SUPPORT = 249,
+-	WMI_TLV_SERVICE_PASSIVE_SCAN_START_TIME_ENHANCE = 263,
 +	WMI_TLV_SERVICE_CONFIGURE_ROAM_TRIGGER_PARAM_SUPPORT = 254,
 +	WMI_TLV_SERVICE_CFR_TA_RA_AS_FP_SUPPORT = 255,
-+	WMI_MAX_EXT_SERVICE = 256,
+ 
+ 	/* The second 128 bits */
+ 	WMI_MAX_EXT_SERVICE = 256,
 +
 +	WMI_TLV_SERVICE_CFR_CAPTURE_COUNT_SUPPORT = 256,
 +	WMI_TLV_SERVICE_OCV_SUPPORT = 257,
@@ -411,12 +317,12 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
 +	WMI_TLV_SERVICE_FSE_CMEM_ALLOC_SUPPORT = 262,
 +	WMI_TLV_SERVICE_PASSIVE_SCAN_START_TIME_ENHANCE = 263,
 +	WMI_TLV_SERVICE_QOS_NULL_FRAME_TX_OVER_WMI = 264,
+ 	WMI_TLV_SERVICE_BIOS_SAR_SUPPORT = 326,
  
--	WMI_MAX_EXT_SERVICE
-+	WMI_MAX_EXT2_SERVICE
+ 	/* The third 128 bits */
+ 	WMI_MAX_EXT2_SERVICE = 384
  };
  
- enum wmi_unit_test_cmdid {
 @@ -3823,6 +3842,7 @@ struct wmi_scan_chan_list_cmd {
  } __packed;
  
@@ -465,15 +371,6 @@ Signed-off-by: Sowmiya Sree Elavalagan <ssreeela@codeaurora.org>
  #define WMI_MAX_MEM_REQS 32
  
  #define MAX_RADIOS 3
-@@ -5736,7 +5768,7 @@ struct ath11k_wmi_base {
- 
- 	struct completion service_ready;
- 	struct completion unified_ready;
--	DECLARE_BITMAP(svc_map, WMI_MAX_EXT_SERVICE);
-+	DECLARE_BITMAP(svc_map, WMI_MAX_EXT2_SERVICE);
- 	wait_queue_head_t tx_credits_wq;
- 	const struct wmi_peer_flags_map *peer_flags;
- 	u32 num_mem_chunks;
 @@ -5917,6 +5949,8 @@ int ath11k_wmi_cmd_send(struct ath11k_pd
  struct sk_buff *ath11k_wmi_alloc_skb(struct ath11k_wmi_base *wmi_sc, u32 len);
  int ath11k_wmi_mgmt_send(struct ath11k *ar, u32 vdev_id, u32 buf_id,

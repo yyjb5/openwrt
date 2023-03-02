@@ -37,18 +37,10 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  /*
   * The maximum number of IPv4 addresses listed for ARP filtering. If the number
   * of addresses for an interface increase beyond this value, hardware ARP
-@@ -631,6 +645,7 @@ struct ieee80211_fils_discovery {
-  * @s1g: BSS is S1G BSS (affects Association Request format).
-  * @beacon_tx_rate: The configured beacon transmit rate that needs to be passed
-  *	to driver when rate control is offloaded to firmware.
-+ * @nss_ap_isolate: Used for notifying the NSS host about AP isolate feature
-  */
- struct ieee80211_bss_conf {
- 	const u8 *bssid;
 @@ -701,6 +716,7 @@ struct ieee80211_bss_conf {
- 	u32 unsol_bcast_probe_resp_interval;
- 	bool s1g;
- 	struct cfg80211_bitrate_mask beacon_tx_rate;
+ 	bool he_su_beamformee;
+ 	bool he_mu_beamformer;
+ 	bool he_full_ul_mumimo;
 +	bool nss_ap_isolate;
  };
  
@@ -80,9 +72,9 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
   */
  enum ieee80211_hw_flags {
 @@ -2462,6 +2490,7 @@ enum ieee80211_hw_flags {
- 	IEEE80211_HW_SUPPORTS_TX_ENCAP_OFFLOAD,
- 	IEEE80211_HW_SUPPORTS_RX_DECAP_OFFLOAD,
  	IEEE80211_HW_SUPPORTS_CONC_MON_RX_DECAP,
+ 	IEEE80211_HW_DETECTS_COLOR_COLLISION,
+ 	IEEE80211_HW_MLO_MCAST_MULTI_LINK_TX,
 +	IEEE80211_HW_SUPPORTS_NSS_OFFLOAD,
  
  	/* keep last, obviously */
@@ -99,15 +91,15 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
   *	This callback is optional, and its return value is passed
   *	to configure_filter(). This callback must be atomic.
 @@ -3927,6 +3960,9 @@ struct ieee80211_ops {
- 				 struct ieee80211_vif *vif,
- 				 struct ieee80211_bss_conf *info,
- 				 u32 changed);
+ 				  struct ieee80211_vif *vif,
+ 				  struct ieee80211_bss_conf *info,
+ 				  u64 changed);
 +	void (*nss_bss_info_changed)(struct ieee80211_hw *hw,
 +				 struct ieee80211_vif *vif,
-+				 u32 changed);
++				 u64 changed);
  
- 	int (*start_ap)(struct ieee80211_hw *hw, struct ieee80211_vif *vif);
- 	void (*stop_ap)(struct ieee80211_hw *hw, struct ieee80211_vif *vif);
+ 	int (*start_ap)(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+ 			struct ieee80211_bss_conf *link_conf);
 @@ -3950,6 +3950,6 @@ struct ieee80211_ops {
  	int (*reset_tid_config)(struct ieee80211_hw *hw,
  				struct ieee80211_vif *vif,
@@ -124,9 +116,9 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  	FLAG(SUPPORTS_RX_DECAP_OFFLOAD),
  	FLAG(SUPPORTS_CONC_MON_RX_DECAP),
 +	FLAG(SUPPORTS_NSS_OFFLOAD),
+ 	FLAG(DETECTS_COLOR_COLLISION),
+ 	FLAG(MLO_MCAST_MULTI_LINK_TX),
  #undef FLAG
- };
- 
 --- a/net/mac80211/util.c
 +++ b/net/mac80211/util.c
 @@ -881,6 +881,22 @@ struct wireless_dev *ieee80211_vif_to_wd
@@ -159,7 +151,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  }
  
 +void ieee80211_nss_bss_info_change_notify(struct ieee80211_sub_if_data *sdata,
-+				      u32 changed)
++				      u64 changed)
 +{
 +	struct ieee80211_local *local = sdata->local;
 +
@@ -210,11 +202,11 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  	struct ieee80211_local *local = sta->local;
  	int cpu;
  
--	if (!sta->pcpu_rx_stats)
+-	if (!sta->deflink.pcpu_rx_stats)
 +	if (ieee80211_hw_check(&sta->local->hw, SUPPORTS_NSS_OFFLOAD))
 +		return stats;
-+
-+ 	if (!sta->pcpu_rx_stats)
++ 
++	if (!sta->deflink.pcpu_rx_stats)
  		return stats;
  
  	for_each_possible_cpu(cpu) {
@@ -248,7 +240,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  		info_id = ieee80211_store_ack_skb(local, skb, &info_flags,
  						  cookie);
  
-@@ -4200,17 +4200,19 @@ static void ieee80211_8023_xmit(struct ieee80211_sub_if_data *sdata,
+@@ -4200,18 +4200,20 @@ static void ieee80211_8023_xmit(struct ieee80211_sub_if_data *sdata,
  	ieee80211_aggr_check(sdata, sta, skb);
  
  	tid = skb->priority & IEEE80211_QOS_CTL_TAG1D_MASK;
@@ -256,7 +248,9 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 -	if (tid_tx) {
 -		if (!test_bit(HT_AGG_STATE_OPERATIONAL, &tid_tx->state)) {
 -			/* fall back to non-offload slow path */
--			__ieee80211_subif_start_xmit(skb, dev, 0, 0, NULL);
+-			__ieee80211_subif_start_xmit(skb, dev, 0,
+-						     IEEE80211_TX_CTRL_MLO_LINK_UNSPEC,
+-						     NULL);
 -			return;
 -		}
 +	if (!ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD) && sta) {
@@ -264,20 +258,20 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 +		if (tid_tx) {
 +			if (!test_bit(HT_AGG_STATE_OPERATIONAL, &tid_tx->state)) {
 +				/* fall back to non-offload slow path */
-+				__ieee80211_subif_start_xmit(skb, dev, 0, 0, NULL);
++				__ieee80211_subif_start_xmit(skb, dev, 0,
++						     IEEE80211_TX_CTRL_MLO_LINK_UNSPEC,
++						     NULL);
 +				return;
 +			}
  
--		info->flags |= IEEE80211_TX_CTL_AMPDU;
 -		if (tid_tx->timeout)
 -			tid_tx->last_tx = jiffies;
-+			info->flags |= IEEE80211_TX_CTL_AMPDU;
 +			if (tid_tx->timeout)
 +				tid_tx->last_tx = jiffies;
 +		}
  	}
  
- 	if (unlikely(skb->sk &&
+ 	skb = ieee80211_tx_skb_fixup(skb, ieee80211_sdata_netdev_features(sdata));
 @@ -4210,7 +4224,8 @@ static void ieee80211_8023_xmit(struct i
  	}
  
@@ -288,19 +282,18 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  		info->ack_frame_id = ieee80211_store_ack_skb(local, skb,
  							     &info->flags, NULL);
  
-@@ -4480,8 +4492,10 @@ static void ieee80211_8023_xmit(struct ieee80211_sub_if_data *sdata,
+@@ -4480,7 +4492,9 @@ static void ieee80211_8023_xmit(struct ieee80211_sub_if_data *sdata,
  
- 	dev_sw_netstats_tx_add(dev, 1, skb->len);
- 
--	sta->tx_stats.bytes[skb_get_queue_mapping(skb)] += skb->len;
--	sta->tx_stats.packets[skb_get_queue_mapping(skb)]++;
+ 	dev_sw_netstats_tx_add(dev, skbs, len);
+-	sta->deflink.tx_stats.packets[queue] += skbs;
+-	sta->deflink.tx_stats.bytes[queue] += len;
 +	if (!ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD) && sta) {
-+		sta->tx_stats.bytes[skb_get_queue_mapping(skb)] += skb->len;
-+		sta->tx_stats.packets[skb_get_queue_mapping(skb)]++;
++		sta->deflink.tx_stats.packets[queue] += skbs;
++		sta->deflink.tx_stats.bytes[queue] += len;
 +	}
  
- 	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
- 		sdata = container_of(sdata->bss,
+ 	ieee80211_tpt_led_trig_tx(local, len);
+ 
 @@ -4510,7 +4510,7 @@ netdev_tx_t ieee80211_subif_start_xmit_8023(struct sk_buff *skb,
  {
  	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
@@ -328,10 +321,10 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
  
  	key = rcu_dereference(sta->ptk[sta->ptk_idx]);
 @@ -4534,6 +4552,7 @@ netdev_tx_t ieee80211_subif_start_xmit_8023(struct sk_buff *skb,
- 		    key->conf.cipher == WLAN_CIPHER_SUITE_TKIP))
  		goto skip_offload;
  
 +tx_offload:
+ 	sk_pacing_shift_update(skb->sk, sdata->local->hw.tx_sk_pacing_shift);
  	ieee80211_8023_xmit(sdata, dev, sta, key, skb);
  	goto out;
  
@@ -385,7 +378,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 +static inline void drv_nss_bss_info_changed(struct ieee80211_local *local,
 +					struct ieee80211_sub_if_data *sdata,
 +					struct ieee80211_bss_conf *info,
-+					u32 changed)
++					u64 changed)
 +{
 +	might_sleep();
 +
@@ -407,11 +400,11 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 @@ -1626,6 +1626,8 @@ int ieee80211_hw_config(struct ieee80211
  void ieee80211_tx_set_protected(struct ieee80211_tx_data *tx);
  void ieee80211_bss_info_change_notify(struct ieee80211_sub_if_data *sdata,
- 				      u32 changed);
+ 				      u64 changed);
 +void ieee80211_nss_bss_info_change_notify(struct ieee80211_sub_if_data *sdata,
-+				      u32 changed);
- void ieee80211_configure_filter(struct ieee80211_local *local);
- u32 ieee80211_reset_erp_info(struct ieee80211_sub_if_data *sdata);
++				      u64 changed);
+ void ieee80211_vif_cfg_change_notify(struct ieee80211_sub_if_data *sdata,
+ 				     u64 changed);
  
 --- a/net/mac80211/trace.h
 +++ b/net/mac80211/trace.h
@@ -423,7 +416,7 @@ Signed-off-by: Sriram R <srirrama@codeaurora.org>
 +	TP_PROTO(struct ieee80211_local *local,
 +		 struct ieee80211_sub_if_data *sdata,
 +		 struct ieee80211_bss_conf *info,
-+		 u32 changed),
++		 u64 changed),
 +
 +	TP_ARGS(local, sdata, info, changed),
 +

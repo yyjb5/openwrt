@@ -27,6 +27,6 @@ Subject: [PATCH] tid fix
  	u8 rssi_chain_pri20[HAL_RX_MAX_NSS];
 -	u8 tid;
 +	u16 tid;
- 	u8 dcm;
- 	u8 ru_alloc;
- 	u8 reception_type;
+ 	u16 ht_flags;
+ 	u16 vht_flags;
+ 	u16 he_flags;
