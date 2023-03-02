@@ -56,6 +56,7 @@ config-$(CONFIG_ATH9K_UBNTHSR) += ATH9K_UBNTHSR
 config-$(CONFIG_ATH10K_LEDS) += ATH10K_LEDS
 config-$(CONFIG_ATH10K_THERMAL) += ATH10K_THERMAL
 config-$(CONFIG_ATH11K_THERMAL) += ATH11K_THERMAL
+config-y += ATH11K_NSS_SUPPORT
 
 config-$(call config_package,ath9k-htc) += ATH9K_HTC
 config-$(call config_package,ath10k) += ATH10K ATH10K_PCI
@@ -63,6 +64,7 @@ config-$(call config_package,ath10k-smallbuffers) += ATH10K ATH10K_PCI ATH10K_SM
 config-$(call config_package,ath11k) += ATH11K
 config-$(call config_package,ath11k-ahb) += ATH11K_AHB
 config-$(call config_package,ath11k-pci) += ATH11K_PCI
+config-$(CONFIG_ATH11K_NSS_SUPPORT) += 
 
 config-$(call config_package,ath5k) += ATH5K
 ifdef CONFIG_TARGET_ath25
@@ -302,9 +304,11 @@ define KernelPackage/ath11k
   TITLE:=Qualcomm 802.11ax wireless chipset support (common code)
   URL:=https://wireless.wiki.kernel.org/en/users/drivers/ath11k
   DEPENDS+= +kmod-ath +@DRIVER_11AC_SUPPORT +@DRIVER_11AX_SUPPORT \
-  +kmod-crypto-michael-mic +ATH11K_THERMAL:kmod-hwmon-core +ATH11K_THERMAL:kmod-thermal
+  +kmod-crypto-michael-mic +ATH11K_THERMAL:kmod-hwmon-core +ATH11K_THERMAL:kmod-thermal +kmod-qca-nss-drv
   FILES:=$(PKG_BUILD_DIR)/drivers/soc/qcom/qmi_helpers.ko \
   $(PKG_BUILD_DIR)/drivers/net/wireless/ath/ath11k/ath11k.ko
+  AUTOLOAD:=$(call AutoProbe,ath11k)
+  MODPARAMS.ath11k:=nss_offload=1 frame_mode=2
 endef
 
 define KernelPackage/ath11k/description
