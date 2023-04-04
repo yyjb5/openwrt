@@ -58,8 +58,6 @@ define Package/ath11k-firmware-qcn9074/install
 	$(INSTALL_DATA) \
 		$(PKG_BUILD_DIR)/ath11k-firmware/QCN9074/hw1.0/testing/2.9.0.1/WLAN.HK.2.9.0.1-01385-QCAHKSWPL_SILICONZ-1/* \
 		$(1)/lib/firmware/ath11k/QCN9074/hw1.0/
-	$(INSTALL_BIN) \
-		$(PKG_BUILD_DIR)/QCN9074/hw1.0/board-2.bin $(1)/lib/firmware/ath11k/QCN9074/hw1.0/board-2.bin
 endef
 
 $(eval $(call BuildPackage,ath11k-firmware-ipq8074))
