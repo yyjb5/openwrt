@@ -135,39 +135,39 @@ Signed-off-by: Álvaro Fernández Rojas <noltari@gmail.com>
 
 --- a/arch/mips/bmips/dma.c
 +++ b/arch/mips/bmips/dma.c
-@@ -64,6 +64,8 @@ phys_addr_t dma_to_phys(struct device *d
- 	return dma_addr;
- }
+@@ -66,6 +66,8 @@ phys_addr_t dma_to_phys(struct device *d
+ 
+ bool bmips_rac_flush_disable;
  
 +bool bmips_rac_flush_disable;
 +
  void arch_sync_dma_for_cpu_all(void)
  {
  	void __iomem *cbr = BMIPS_GET_CBR();
-@@ -74,6 +76,9 @@ void arch_sync_dma_for_cpu_all(void)
- 	    boot_cpu_type() != CPU_BMIPS4380)
+@@ -77,6 +79,9 @@ void arch_sync_dma_for_cpu_all(void)
  		return;
  
-+	if (unlikely(bmips_rac_flush_disable))
+ 	if (unlikely(bmips_rac_flush_disable))
 +		return;
 +
++	if (unlikely(bmips_rac_flush_disable))
+ 		return;
+ 
  	/* Flush stale data out of the readahead cache */
- 	cfg = __raw_readl(cbr + BMIPS_RAC_CONFIG);
- 	__raw_writel(cfg | 0x100, cbr + BMIPS_RAC_CONFIG);
 --- a/arch/mips/bmips/setup.c
 +++ b/arch/mips/bmips/setup.c
-@@ -34,6 +34,8 @@
- #define REG_BCM6328_OTP		((void __iomem *)CKSEG1ADDR(0x1000062c))
- #define BCM6328_TP1_DISABLED	BIT(9)
+@@ -36,6 +36,8 @@
+ 
+ extern bool bmips_rac_flush_disable;
  
 +extern bool bmips_rac_flush_disable;
 +
  static const unsigned long kbase = VMLINUX_LOAD_ADDRESS & 0xfff00000;
  
  struct bmips_quirk {
-@@ -103,6 +105,12 @@ static void bcm6358_quirks(void)
- 	 * disable SMP for now
+@@ -70,6 +72,12 @@ static void bcm3384_viper_quirks(void)
  	 */
+ 	board_ebase_setup = &kbase_setup;
  	bmips_smp_enabled = 0;
 +
 +	/*
@@ -177,4 +177,4 @@ Signed-off-by: Álvaro Fernández Rojas <noltari@gmail.com>
 +	bmips_rac_flush_disable = !!(read_c0_brcm_cmt_local() & (1 << 31));
  }
  
- static void bcm6368_quirks(void)
+ static void bcm63xx_fixup_cpu1(void)

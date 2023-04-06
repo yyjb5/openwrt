@@ -15,7 +15,7 @@ Signed-off-by: Álvaro Fernández Rojas <noltari@gmail.com>
 
 --- a/arch/mips/bmips/setup.c
 +++ b/arch/mips/bmips/setup.c
-@@ -31,13 +31,52 @@
+@@ -31,8 +31,42 @@
  
  #define RELO_NORMAL_VEC		BIT(18)
  
@@ -58,17 +58,19 @@ Signed-off-by: Álvaro Fernández Rojas <noltari@gmail.com>
  
  extern bool bmips_rac_flush_disable;
  
+@@ -40,6 +74,11 @@ extern bool bmips_rac_flush_disable;
+ 
  static const unsigned long kbase = VMLINUX_LOAD_ADDRESS & 0xfff00000;
  
 +struct bmips_cpufreq {
 +	const char		*compatible;
 +	u32			(*cpu_freq)(void);
-+};
++}
 +
  struct bmips_quirk {
  	const char		*compatible;
  	void			(*quirk_fn)(void);
-@@ -142,17 +181,161 @@ const char *get_system_type(void)
+@@ -150,17 +189,161 @@ const char *get_system_type(void)
  	return "Generic BMIPS kernel";
  }
  
