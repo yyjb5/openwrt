@@ -24,8 +24,5 @@ flow_offloading_hw="$(uci -q get firewall.@defaults[0].flow_offloading_hw)"
 	    for q in $(ls /sys/class/net/wan/queues/rx-*/rps_flow_cnt); do echo 4096 > $q; done
 
 	    echo 32768 > /proc/sys/net/core/rps_sock_flow_entries
-
-		# Enable threaded network backlog processing
-		echo 1 > /proc/sys/net/core/backlog_threaded
 	fi
 }
