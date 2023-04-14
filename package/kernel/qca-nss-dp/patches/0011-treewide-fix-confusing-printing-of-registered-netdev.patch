@@ -17,7 +17,7 @@ diff --git a/nss_dp_main.c b/nss_dp_main.c
 index c0ae9d6..441c300 100644
 --- a/nss_dp_main.c
 +++ b/nss_dp_main.c
-@@ -860,6 +860,9 @@ static int32_t nss_dp_probe(struct platf
+@@ -900,6 +900,9 @@ static int32_t nss_dp_probe(struct platform_device *pdev)
  		goto phy_setup_fail;
  	}
 
@@ -26,6 +26,3 @@ index c0ae9d6..441c300 100644
 +
  	dp_global_ctx.nss_dp[nss_dp_get_idx_from_macid(dp_priv->macid)] = dp_priv;
  	dp_global_ctx.slowproto_acl_bm = 0;
-
---
-2.34.1
