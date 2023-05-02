@@ -1,0 +1,33 @@
+#!/bin/sh /etc/rc.common
+
+START=21
+
+start() {
+
+# Enabled threaded network backlog processing
+
+echo 1 > /proc/sys/net/core/backlog_threaded
+
+# Enabled "hairpin_mode" in LANs ports of br-lan for fix NAT Loopback with ECM enabled, by the default the value for the radios WIFI is 1, so I don't touch it
+
+for i in `ls -1d /sys/class/net/br-lan/brif/lan*`
+do
+	echo 1 > $i/hairpin_mode
+done
+
+}
+
+stop() {
+
+# Disabled threaded network backlog processing
+
+echo 0 > /proc/sys/net/core/backlog_threaded
+
+# Disabled "hairpin_mode" in LANs ports of br-lan for fix NAT Loopback with ECM disabled, by the default the value for the radios WIFI is 1, so I don't touch it
+
+for i in `ls -1d /sys/class/net/br-lan/brif/lan*`
+do
+	echo 0 > $i/hairpin_mode
+done
+
+}
