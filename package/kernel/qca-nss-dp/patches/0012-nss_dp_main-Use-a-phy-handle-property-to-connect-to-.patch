@@ -27,7 +27,7 @@ diff --git a/include/nss_dp_dev.h b/include/nss_dp_dev.h
 index 19b3e78..63a857a 100644
 --- a/include/nss_dp_dev.h
 +++ b/include/nss_dp_dev.h
-@@ -100,13 +100,10 @@ struct nss_dp_dev {
+@@ -123,13 +123,10 @@ struct nss_dp_dev {
  	unsigned long drv_flags;	/* Driver specific feature flags */
 
  	/* Phy related stuff */
@@ -46,7 +46,7 @@ diff --git a/nss_dp_main.c b/nss_dp_main.c
 index 441c300..a1e8627 100644
 --- a/nss_dp_main.c
 +++ b/nss_dp_main.c
-@@ -399,7 +399,7 @@ static int nss_dp_open(struct net_device *netdev)
+@@ -417,7 +417,7 @@ static int nss_dp_open(struct net_device *netdev)
 
  	netif_start_queue(netdev);
 
@@ -55,7 +55,7 @@ index 441c300..a1e8627 100644
  		/* Notify data plane link is up */
  		if (dp_priv->data_plane_ops->link_state(dp_priv->dpc, 1)) {
  			netdev_dbg(netdev, "Data plane set link failed\n");
-@@ -576,6 +576,8 @@ static int32_t nss_dp_of_get_pdata(struct device_node *np,
+@@ -612,6 +612,8 @@ static int32_t nss_dp_of_get_pdata(struct device_node *np,
  		return -EFAULT;
  	}
 
@@ -64,7 +64,7 @@ index 441c300..a1e8627 100644
  	if (of_property_read_u32(np, "qcom,mactype", &hal_pdata->mactype)) {
  		pr_err("%s: error reading mactype\n", np->name);
  		return -EFAULT;
-@@ -594,16 +596,6 @@ static int32_t nss_dp_of_get_pdata(struct device_node *np,
+@@ -630,16 +632,6 @@ static int32_t nss_dp_of_get_pdata(struct device_node *np,
  #else
  	of_get_phy_mode(np, &dp_priv->phy_mii_type);
  #endif
@@ -81,7 +81,7 @@ index 441c300..a1e8627 100644
 
  	ret = of_get_mac_address(np, maddr);
  	if (!ret && is_valid_ether_addr(maddr)) {
-@@ -636,50 +628,6 @@ static int32_t nss_dp_of_get_pdata(struct device_node *np,
+@@ -672,50 +664,6 @@ static int32_t nss_dp_of_get_pdata(struct device_node *np,
  	return 0;
  }
 
@@ -132,7 +132,7 @@ index 441c300..a1e8627 100644
  #ifdef CONFIG_NET_SWITCHDEV
  /*
   * nss_dp_is_phy_dev()
-@@ -738,7 +686,6 @@ static int32_t nss_dp_probe(struct platform_device *pdev)
+@@ -774,7 +722,6 @@ static int32_t nss_dp_probe(struct platform_device *pdev)
  	struct device_node *np = pdev->dev.of_node;
  	struct nss_gmac_hal_platform_data gmac_hal_pdata;
  	int32_t ret = 0;
@@ -140,7 +140,7 @@ index 441c300..a1e8627 100644
  #if defined(NSS_DP_PPE_SUPPORT)
  	uint32_t vsi_id;
  	fal_port_t port_id;
-@@ -758,24 +758,18 @@ static int32_t nss_dp_probe(struct platf
+@@ -851,24 +798,18 @@ static int32_t nss_dp_probe(struct platform_device *pdev)
 
  	dp_priv->drv_flags |= NSS_DP_PRIV_FLAG(INIT_DONE);
 
@@ -174,5 +174,3 @@ index 441c300..a1e8627 100644
  	}
 
  #if defined(NSS_DP_PPE_SUPPORT)
---
-2.36.1
