@@ -32,7 +32,7 @@ EXCLUDE_FEEDS:=nss_packages
 # 1: destination file
 define FeedSourcesAppend
 ( \
-  echo 'src/gz %d_core https://openwrt.admincomps.ru/nss/$(shell date +"%Y%m%d")/packages'; \
+  echo 'src/gz %d_core https://openwrt.admincomps.ru/nss-wifi/$(shell date +"%Y%m%d")/packages'; \
   $(strip $(if $(CONFIG_PER_FEED_REPO), \
 	echo 'src/gz %d_base %U/packages/%A/base'; \
 	$(if $(filter %SNAPSHOT-y,$(VERSION_NUMBER)-$(CONFIG_BUILDBOT)), \
