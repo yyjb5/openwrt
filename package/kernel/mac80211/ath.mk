@@ -315,6 +315,7 @@ define KernelPackage/ath11k
   FILES:=$(PKG_BUILD_DIR)/drivers/soc/qcom/qmi_helpers.ko \
   $(PKG_BUILD_DIR)/drivers/net/wireless/ath/ath11k/ath11k.ko
 ifdef CONFIG_ATH11K_NSS_SUPPORT
+  DEPENDS+=+kmod-qca-nss-drv-wifi-meshmgr
   AUTOLOAD:=$(call AutoProbe,ath11k)
   MODPARAMS.ath11k:=nss_offload=1 frame_mode=2
 endif
@@ -343,6 +344,7 @@ define KernelPackage/ath11k/config
                select ATH11K_MEM_PROFILE_256M if (TARGET_qualcommax_ipq807x_DEVICE_netgear_wax218)
                select NSS_DRV_WIFI_ENABLE
                select NSS_DRV_WIFI_EXT_VDEV_ENABLE
+               select PACKAGE_kmod-qca-nss-drv-wifi-meshmgr if (PACKAGE_MAC80211_MESH)
                default y if TARGET_qualcommax
 
        choice
