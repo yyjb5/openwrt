@@ -347,7 +347,7 @@ define KernelPackage/ath11k/config
                select ATH11K_MEM_PROFILE_256M if (TARGET_qualcommax_ipq807x_DEVICE_netgear_wax218)
                select NSS_DRV_WIFI_ENABLE
                select NSS_DRV_WIFI_MESH_ENABLE if PACKAGE_MAC80211_MESH
-               # default y if TARGET_qualcommax
+               default y if TARGET_qualcommax
 
        choice
             prompt "Memory Profile"
