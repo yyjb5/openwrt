@@ -1348,14 +1348,12 @@ Signed-off-by: Vasanthakumar Thiagarajan <vthiagar@codeaurora.org>
  	default:
  		ath11k_dbg(ab, ATH11K_DBG_NSS, "unhandled event %d\n", msg_type);
  		break;
-@@ -893,32 +904,15 @@ static void
+@@ -893,32 +904,13 @@ static void
  ath11k_nss_vdev_data_receive(struct net_device *dev, struct sk_buff *skb,
  			     __attribute__((unused)) struct napi_struct *napi)
  {
 -	struct wireless_dev *wdev;
 -	struct ieee80211_vif *vif;
-+	struct wireless_dev *wdev = NULL;
-+	struct ieee80211_vif *vif = NULL;
  	struct ath11k_vif *arvif;
  	struct ath11k_base *ab;
  	bool eth_decap = false;

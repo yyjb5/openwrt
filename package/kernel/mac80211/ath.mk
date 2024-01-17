@@ -311,11 +311,14 @@ define KernelPackage/ath11k
   URL:=https://wireless.wiki.kernel.org/en/users/drivers/ath11k
   DEPENDS+= +kmod-ath +@DRIVER_11AC_SUPPORT +@DRIVER_11AX_SUPPORT \
   +kmod-crypto-michael-mic +ATH11K_THERMAL:kmod-hwmon-core +ATH11K_THERMAL:kmod-thermal \
-  +ATH11K_NSS_SUPPORT:kmod-qca-nss-drv
+  +ATH11K_NSS_SUPPORT:kmod-qca-nss-drv \
+  +@(PACKAGE_MAC80211_MESH&&ATH11K_NSS_SUPPORT):PACKAGE_kmod-qca-nss-drv-wifi-meshmgr
   FILES:=$(PKG_BUILD_DIR)/drivers/soc/qcom/qmi_helpers.ko \
   $(PKG_BUILD_DIR)/drivers/net/wireless/ath/ath11k/ath11k.ko
 ifdef CONFIG_ATH11K_NSS_SUPPORT
+ifdef CONFIG_PACKAGE_MAC80211_MESH
   DEPENDS+=+kmod-qca-nss-drv-wifi-meshmgr
+endif
   AUTOLOAD:=$(call AutoProbe,ath11k)
   MODPARAMS.ath11k:=nss_offload=1 frame_mode=2
 endif
@@ -343,12 +346,12 @@ define KernelPackage/ath11k/config
                	 TARGET_qualcommax_ipq807x_DEVICE_zte_mf269 )
                select ATH11K_MEM_PROFILE_256M if (TARGET_qualcommax_ipq807x_DEVICE_netgear_wax218)
                select NSS_DRV_WIFI_ENABLE
-               select NSS_DRV_WIFI_EXT_VDEV_ENABLE
-               select PACKAGE_kmod-qca-nss-drv-wifi-meshmgr if (PACKAGE_MAC80211_MESH)
-               default y if TARGET_qualcommax
+               select NSS_DRV_WIFI_MESH_ENABLE if PACKAGE_MAC80211_MESH
+               # default y if TARGET_qualcommax
 
        choice
-          prompt "ATH11K Memory Profile"
+            prompt "Memory Profile"
+            depends on PACKAGE_kmod-ath11k
             default ATH11K_MEM_PROFILE_1G
             help
             	This option allows you to select the memory profile.
@@ -370,6 +373,7 @@ define KernelPackage/ath11k/config
                help
                   This allows configuring ath11k for boards with 256M memory.
                   The default is 1GB if not selected
+
        endchoice
 endef
 
