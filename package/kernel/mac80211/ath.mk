@@ -313,7 +313,7 @@ define KernelPackage/ath11k
   +kmod-crypto-michael-mic +ATH11K_THERMAL:kmod-hwmon-core +ATH11K_THERMAL:kmod-thermal \
   +ATH11K_NSS_SUPPORT:kmod-qca-nss-drv \
   +@(PACKAGE_MAC80211_MESH&&ATH11K_NSS_SUPPORT):PACKAGE_kmod-qca-nss-drv-wifi-meshmgr \
-  +@(ATH11K_NSS_SUPPORT):NSS_DRV_WIFI_ENABLE \
+  +@(ATH11K_NSS_SUPPORT):NSS_DRV_WIFIOFFLOAD_ENABLE \
   +@(ATH11K_NSS_SUPPORT):NSS_DRV_WIFI_EXT_VDEV_ENABLE
   FILES:=$(PKG_BUILD_DIR)/drivers/soc/qcom/qmi_helpers.ko \
   $(PKG_BUILD_DIR)/drivers/net/wireless/ath/ath11k/ath11k.ko
@@ -347,7 +347,7 @@ define KernelPackage/ath11k/config
                	 TARGET_qualcommax_ipq807x_DEVICE_xiaomi_ax3600 || \
                	 TARGET_qualcommax_ipq807x_DEVICE_zte_mf269 )
                select ATH11K_MEM_PROFILE_256M if (TARGET_qualcommax_ipq807x_DEVICE_netgear_wax218)
-               select NSS_DRV_WIFI_ENABLE
+               select NSS_DRV_WIFIOFFLOAD_ENABLE
                select NSS_DRV_WIFI_MESH_ENABLE if PACKAGE_MAC80211_MESH
                default y if TARGET_qualcommax
 
