@@ -4,6 +4,7 @@ on:
     branches:
       - "dev"
       - "master"
+      - "ax3000t.yaml"
   workflow_dispatch:
 
 jobs:
